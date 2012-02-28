@@ -81,7 +81,7 @@
                 settings.scrollbarOffset = helpers._getScrollbarWidth();
 		settings.themeClassName = settings.themeClass;
 		
-		if (settings.width.search('%') > -1) {
+		if (settings.width.search('%') > -1) { // warning: any percentage (80%, 100%, ..) is assumed to be "100%" of the parent
 		    var widthMinusScrollbar = $self.parent().width() - settings.scrollbarOffset;
 		} else {
 		    var widthMinusScrollbar = settings.width - settings.scrollbarOffset;				
@@ -157,8 +157,8 @@
                     tfootHeight = $tfoot.outerHeight(true);
                 }
 
-                var tbodyHeight = $wrapper.height() - $thead.outerHeight(true) - tfootHeight - tableProps.border;
-                
+                var tbodyHeight = $wrapper.height() - $thead.outerHeight(true) - tfootHeight;
+                tbodyHeight -= settings.borderCollapse ? ( settings.cloneHeadToFoot ? tableProps.border : 2* tableProps.border ) : 0;
                 $divBody.css({
 	            'height': tbodyHeight
 	        });
@@ -327,7 +327,11 @@
             	var $self = $obj,
             	$wrapper = $self.closest('.fht-table-wrapper'),
             	$thead = $self.siblings('.fht-thead'),
-            	$tfoot = $self.siblings('.fht-tfoot');
+            	$tfoot = $self.siblings('.fht-tfoot'),
+            	$scrollAdjust = 0;
+            	if (settings.borderCollapse) {
+            	    $scrollAdjust = tableProps.border;
+            	}
             	
             	$self.bind('scroll', function() {
             	    if (settings.fixedColumns > 0) {
@@ -335,7 +339,7 @@
             	        
             	        $fixedColumns.find('.fht-tbody table')
             	            .css({
-            	                'margin-top': -$self.scrollTop()
+            	                'margin-top': -$self.scrollTop() - $scrollAdjust
             	            });
             	    }
             	    
@@ -357,13 +361,14 @@
              * return void
              */
             _fixHeightWithCss: function ($obj, tableProps) {
+                var borderAdjust = settings.borderCollapse ? tableProps.border : 0;
             	if (settings.includePadding) {
 	            $obj.css({
-	            	'height': $obj.height() + tableProps.border
+	            	'height': $obj.height() + borderAdjust
 	            });
             	} else {
             	    $obj.css({
-            		'height': $obj.parent().height() + tableProps.border
+            		'height': $obj.parent().height() + borderAdjust
             	    });
             	}
             },
@@ -411,13 +416,13 @@
 		$tbody.find('table.fht-table').addClass(settings.originalTable.attr('class'));
 		$tfoot.find('table.fht-table').addClass(settings.originalTable.attr('class'));
 		
+		// Fix cell width and heights in header
 		$firstThChildren = $fixedBody.find('.fht-thead thead tr > *:lt(' + settings.fixedColumns + ')');
-		fixedColumnWidth = settings.fixedColumns * tableProps.border;
+		fixedColumnWidth = settings.borderCollapse ? tableProps.border : 0;
 		$firstThChildren.each(function(index) {
 		    fixedColumnWidth += $(this).outerWidth(true);
 		});
 
-		// Fix cell heights
 		helpers._fixHeightWithCss($firstThChildren, tableProps);
 		helpers._fixWidthWithCss($firstThChildren, tableProps);
 
@@ -426,6 +431,7 @@
 		    tdWidths.push($(this).width());
 		});
 
+		// Fix cell width and heights in body
 		firstTdChildrenSelector = 'tbody tr > *:not(:nth-child(n+' + (settings.fixedColumns + 1) + '))';
 		$firstTdChildren = $fixedBody.find(firstTdChildrenSelector)
 		    .each(function(index) {
@@ -440,8 +446,15 @@
 		
 		$tbody.appendTo($fixedColumn)
 		    .css({
-			'margin-top': -1,
-			'height': fixedBodyHeight + tableProps.border
+			'height': fixedBodyHeight,
+		    });
+            	var $scrollAdjust = 0;
+            	if (settings.borderCollapse) {
+            	    $scrollAdjust = tableProps.border;
+            	}
+		$tbody.find('table.fht-table')
+		    .css({
+		        'margin-top': -$scrollAdjust
 		    });
 
 		var $newRow;
@@ -480,7 +493,7 @@
 		
 		// set width of body table wrapper
 		$fixedBody.css({
-		    'width': fixedBodyWidth
+		    'width': fixedBodyWidth + settings.scrollbarOffset
 		});
 		
 		// setup clone footer with fixed column
@@ -536,7 +549,7 @@
             	    $divFoot.find('table')
             		.append($tfoot)
 	                .css({
-	                    'margin-top': -tableProps.border
+	                    'margin-top': 0 // -tableProps.border
 	                });
             	    
             	    helpers._setupClone($divFoot, tableProps.tfoot);
